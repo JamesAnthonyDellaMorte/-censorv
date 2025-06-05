@@ -278,7 +278,7 @@ fn extract_wav(src: &Path) -> Result<(NamedTempFile, PathBuf)> {
 
 fn mute_video(src: &Path, dst: &Path, filt: Option<String>, threads: u32) -> Result<()> {
     let mut cmd = Command::new("ffmpeg");
-    cmd.arg("-loglevel").arg("error")
+    cmd.arg("-loglevel").arg("info")
        .arg("-y")
        .arg("-i").arg(src);
 
