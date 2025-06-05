@@ -212,34 +212,40 @@ fn transcribe(wav: &Path, ctx: &WhisperContext, beam_size: u32) -> Result<Vec<Wo
 
 
     let mut words = Vec::new();
-    for i in 0..num_segments {
-        let num_tokens = state.full_n_tokens(i).context(format!("Failed to get token count for segment {}", i))?;
-        for j in 0..num_tokens {
-            if let Ok(token_data) = state.full_get_token_data(i, j) {
-                 // Skip special tokens like <|nospeech|> etc.
-                if token_data.id >= ctx.token_eot() { // Assuming special tokens are at/after EOT. Check whisper-rs docs for specifics.
-                    continue;
-                }
-                let text = state.full_get_token_text(i, j).context(format!("Failed to get text for token {} in segment {}",j,i))?;
-                // Filter out tokens that are just spaces or start with special characters like Whisper's timestamp tokens
-                let trimmed_text = text.trim();
-                if trimmed_text.is_empty() || trimmed_text.starts_with("<|") {
-                    continue;
-                }
-
-                let start_time = token_data.t0 as f32 * 0.01;
-                let end_time = token_data.t1 as f32 * 0.01;
-                
-                words.push(Word {
-                    start: start_time,
-                    end: end_time,
-                    text: trimmed_text.to_string(),
-                });
-            } else {
-                 eprintln!("Warning: Could not retrieve token data for segment {}, token {}", i, j);
+for i in 0..num_segments {
+    let num_tokens = state.full_n_tokens(i).context(format!("Failed to get token count for segment {}", i))?;
+    for j in 0..num_tokens {
+        if let Ok(token_data) = state.full_get_token_data(i, j) {
+            // Skip special tokens like <|nospeech|> etc.
+            if token_data.id >= ctx.token_eot() {
+                continue;
             }
+            match state.full_get_token_text(i, j) {
+                Ok(text) => {
+                    let trimmed_text = text.trim();
+                    if trimmed_text.is_empty() || trimmed_text.starts_with("<|") {
+                        continue;
+                    }
+                    let start_time = token_data.t0 as f32 * 0.01;
+                    let end_time = token_data.t1 as f32 * 0.01;
+
+                    words.push(Word {
+                        start: start_time,
+                        end: end_time,
+                        text: trimmed_text.to_string(),
+                    });
+                }
+                Err(e) => {
+                    eprintln!("Skipping invalid token text in segment {}, token {}: {:?}", i, j, e);
+                    continue;
+                }
+            }
+        } else {
+            eprintln!("Warning: Could not retrieve token data for segment {}, token {}", i, j);
         }
     }
+}
+
     Ok(words)
 }
 
